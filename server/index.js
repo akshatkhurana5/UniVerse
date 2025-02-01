@@ -21,8 +21,10 @@ app.use(cors());
 
 
 const postRoutes = require("./routes/post");
-app.use("/api/posts", postRoutes);
+const clubRoutes = require("./routes/clubs");
 
+app.use("/api/posts", postRoutes);
+app.use("/api/clubs", clubRoutes);
 
 
 
