@@ -3,33 +3,46 @@ const router = express.Router();
 const wrapAsync = require("../utils/wrapAsync");
 const Club = require("../models/Club");
 const Event = require("../models/Event");
-
+const Post=require("../models/Post");
 // Get all clubs
 router.get("/", wrapAsync(async (req, res) => {
     const clubs = await Club.find({});
     res.status(200).json({ clubs });
 }));
 
-// Get a specific club by ID
+// Get a specific club
 router.get("/:id", wrapAsync(async (req, res) => {
-    const club = await Club.findById(req.params.id)/*.populate("members.user", "name email");*/ // Populate members
+    const club = await Club.findById(req.params.id)
+        .populate("members.user", "name email")
+        .populate("facultyHead", "name email")
+        .populate("events", "name date location")
+        .populate({
+            path: "posts",
+            populate: { 
+                path: "createdBy",
+                select: "name"
+            }
+        });
+        
+
     if (!club) return res.status(404).json({ message: "Club not found" });
+
     res.status(200).json({ club });
 }));
 
 // Create a new club
 router.post("/", wrapAsync(async (req, res) => {
-    const { name, description, facultyHead } = req.body;
-    if (!name || !description || !facultyHead) {
-        return res.status(400).json({ message: "Name, description, and faculty head are required." });
-    }
+    const { clubDetails } = req.body;
+    const { facultyHead } = clubDetails;
 
     const newClub = new Club({
-        name,
-        description,
-        facultyHead,
-        members: [{ user: facultyHead, role: "President" }] // Automatically assign facultyHead as President
+        ...clubDetails,
+        members: [{ user: facultyHead, role: "Faculty Head" }],
     });
+
+    if (req.file) {
+        newClub.image = { filename: req.file.filename, url: req.file.path };
+    }
 
     const savedClub = await newClub.save();
     res.status(201).json(savedClub);
@@ -37,8 +50,15 @@ router.post("/", wrapAsync(async (req, res) => {
 
 // Update club details
 router.put("/:id", wrapAsync(async (req, res) => {
-    const updatedClub = await Club.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    let updatedClub = await Club.findByIdAndUpdate(req.params.id, req.body, { new: true });
+
     if (!updatedClub) return res.status(404).json({ message: "Club not found" });
+
+    if (req.file) {
+        updatedClub.image = { filename: req.file.filename, url: req.file.path };
+        await updatedClub.save();
+    }
+
     res.status(200).json(updatedClub);
 }));
 
@@ -51,18 +71,19 @@ router.delete("/:id", wrapAsync(async (req, res) => {
     res.status(200).json({ message: "Club deleted successfully" });
 }));
 
-// Join a club with a role
+// Join a club
 router.put("/:id/join", wrapAsync(async (req, res) => {
     const { userId, role } = req.body;
     const club = await Club.findById(req.params.id);
     if (!club) return res.status(404).json({ message: "Club not found" });
 
-    // Check if the user is already a member
+    // Check if user already a member
     const isMember = club.members.some(member => member.user.toString() === userId);
     if (isMember) return res.status(400).json({ message: "User is already a member" });
 
-    club.members.push({ user: userId, role: role || "Member" }); // Default role to "Member"
+    club.members.push({ user: userId, role: role || "Member" });
     await club.save();
+
     res.status(200).json({ message: "User joined the club successfully" });
 }));
 
@@ -74,60 +95,28 @@ router.put("/:id/leave", wrapAsync(async (req, res) => {
 
     club.members = club.members.filter(member => member.user.toString() !== userId);
     await club.save();
+
     res.status(200).json({ message: "User left the club successfully" });
 }));
 
-// Add an event to a club
-router.post("/:id/addEvent", wrapAsync(async (req, res) => {
-    const { name, description, date, time, location, createdBy, media } = req.body;
+// Get all events by a specific club
+router.get("/:id/events", wrapAsync(async (req, res) => {
+    const { id } = req.params;
+    const events = await Event.find({ createdBy: id, createdByModel: "Club" })
+        .populate("createdBy", "name");
 
-    // Check for missing fields
-    if (!name || !description || !date || !time || !location || !createdBy) {
-        return res.status(400).json({ message: "All event details are required." });
-    }
-
-    // Validate date format
-    const eventDate = new Date(date);
-    if (isNaN(eventDate.getTime())) {
-        return res.status(400).json({ message: "Invalid date format." });
-    }
-
-    // Find the club where this event is being added
-    const club = await Club.findById(req.params.id);
-    if (!club) return res.status(404).json({ message: "Club not found" });
-
-    // Create and save new event
-    const event = new Event({
-        name,
-        description,
-        date: eventDate,
-        time,
-        location,
-        createdBy,
-        media: media || [] // Store media links if provided
-    });
-
-    const savedEvent = await event.save();
-
-    // Add event ID to club
-    club.events.push(savedEvent._id);
-    await club.save();
-
-    res.status(201).json({ message: "Event created successfully", event: savedEvent });
+    res.status(200).json({ events });
 }));
 
 
-// Delete an event from a club
-router.delete("/:id/deleteEvent/:eventId", wrapAsync(async (req, res) => {
-    const { id, eventId } = req.params;
-    const club = await Club.findById(id);
-    if (!club) return res.status(404).json({ message: "Club not found" });
+router.get("/:id/posts", wrapAsync(async (req, res) => {
+    const { id } = req.params;
+    const posts = await Post.find({ createdBy: id, createdByModel: "Club" })
+        .populate("createdBy", "name");
 
-    club.events = club.events.filter(event => event.toString() !== eventId);
-    await Event.findByIdAndDelete(eventId);
-    await club.save();
-
-    res.status(200).json({ message: "Event deleted successfully" });
+    res.status(200).json({ posts });
 }));
+
+
 
 module.exports = router;

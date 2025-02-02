@@ -5,12 +5,18 @@ const postSchema = new mongoose.Schema({
         required: true 
     },
     media: [{ 
-        type: String 
+        filename:{type: String},
+        url:{type: String},
     }], // URLs for images/videos
-    createdBy: { 
+    postedBy: { 
         type: mongoose.Schema.Types.ObjectId, 
-        ref: 'User', 
-        // required: true 
+        required: true, 
+        ref: 'postedByModel', 
+    },
+    postedByModel:{
+        type: String,
+        enum: ['User', 'Club'],
+        required: true
     },
     likes: [{ 
         type: mongoose.Schema.Types.ObjectId, 

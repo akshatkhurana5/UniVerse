@@ -4,7 +4,7 @@ const wrapAsync = require("../utils/wrapAsync");
 const Post = require("../models/Post");
 
 router.get("/", wrapAsync(async (req, res) => {
-    const posts = await Post.find({});
+    const posts = await Post.find().populate("postedBy", "name").sort({ createdAt: -1 });
     res.status(200).json({ posts });
 }));
 
@@ -16,18 +16,21 @@ router.get("/:id", wrapAsync(async (req, res) => {
 
 
 router.post("/", wrapAsync(async (req, res) => {
-    const { userId, content, media } = req.body;
-
-    if (!userId || !content) {
-        return res.status(400).json({ message: "User ID and content are required." });
+    const { postDetails } = req.body;
+    const { postedBy, postedByModel } = postDetails;
+    if (!['User', 'Club'].includes(postedByModel)) {
+        return res.status(400).json({ message: "Invalid postedByModel. Must be 'User' or 'Club'." });
     }
-
-    const newPost = new Post({
-        user: userId,
-        content,
-        media,
-    });
-
+    
+    const validPoster = postedByModel === 'User' ? await User.findById(postedBy) : await Club.findById(postedBy);
+    if (!validPoster) return res.status(404).json({ message: `${postedByModel} not found.` });
+    
+    const newPost = new Post({postDetails});
+    if (req.files) {
+        req.files.forEach(file => {
+            post.media.push({ filename: file.filename, url: file.path });
+        });
+    }
     const savedPost = await newPost.save();
     res.status(201).json(savedPost);
 }));
@@ -56,6 +59,7 @@ router.delete("/:id", wrapAsync(async (req, res) => {
 
 router.put("/:id/like", wrapAsync(async (req, res) => {
     const post = await Post.findById(req.params.id);
+    
     if (!post) {
         return res.status(404).json({ message: 'Post not found' });
     }

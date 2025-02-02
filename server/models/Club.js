@@ -4,6 +4,10 @@ const clubSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    image:{
+        filename:{type: String},
+        url:{type:String},
+    },
     description: {
         type: String,
         required: true,
@@ -19,6 +23,10 @@ const clubSchema = new mongoose.Schema({
     events: [{ 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Event' 
+    }],
+    posts:[{
+        type: mongoose.Schema.Types.ObjectId, 
+        ref: 'Post'
     }],
     createdAt: { 
         type: Date, 
