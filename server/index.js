@@ -23,10 +23,12 @@ app.use(cors());
 const postRoutes = require("./routes/post");
 const clubRoutes = require("./routes/clubs");
 const eventRoutes = require("./routes/event");
+const userRoutes=require("./routes/user");
 
 app.use("/api/posts", postRoutes);
 app.use("/api/clubs", clubRoutes);
 app.use("/api/clubs", eventRoutes);
+app.use("/api/users", userRoutes);
 
 
 
